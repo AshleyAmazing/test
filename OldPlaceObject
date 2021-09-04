@@ -1,0 +1,161 @@
+//This simple script checks if you pick up an item and release it near this element. This element must share the same parent as the grabbable element that will trigger it. This script can be triggered by picking up/putting down items nearby. This is best paired with a grab script on the target object.
+
+const messages = require('messages');
+const timers = require('timers');
+
+const TARGET_OBJ = '{[Target object to set off trigger:string]}';
+
+const MSG_PICKUP = '{[object Pick Up Message: string]}';
+const MSG_RELEASE = '{[object Release Message: string]}';
+const MSG_PLACED = '{[Placed Message: string]}';
+const PROX_THRESH = {[Distance to object:float=0.05]};
+
+const USE_VISIBLE = {[Check target object is visible:bool]};
+
+const USE_DEBUGMODE = {[Use Debug Logs:bool]};
+
+var sameParentObj;
+var keyObject;
+
+var self = this;
+
+var readyToCheck = true;
+var timer;
+/**
+ * Called when the script is initialized.
+ */
+
+function enter() 
+{
+
+  if(USE_DEBUGMODE)
+    log.info("Running a test on debug mode - PlaceObjectTrigger");
+  
+  if(MSG_PICKUP)
+    messages.on(MSG_PICKUP, Pickup);
+    
+  if(MSG_RELEASE)
+    messages.on(MSG_RELEASE, checkIfClose);
+
+  //Get reference to shared parent between target and self - this just makes it easier to grab a reference to the target object
+  sameParentObj = this.parent;  
+    
+  //get reference to target object
+  if(sameParentObj=== null)
+  {
+    log.error("Missing parent on PlaceObjectTrigger: " + sameParentObj);
+    return;
+  }
+  else
+  {
+    keyObject = sameParentObj.findOne('..(@name==' + TARGET_OBJ + ')'); 
+    
+    if(keyObject===null)
+    {
+      log.error("Could not find target object for PlaceObjectTrigger" + TARGET_OBJ);
+    }
+   
+  }
+
+}
+
+function Pickup()
+{
+  
+  if(USE_DEBUGMODE)
+  {
+      log.info("triggered pickup");
+  }
+  
+  if(readyToCheck)
+  {
+    readyToCheck = false;
+   
+    if(USE_DEBUGMODE)
+    {
+      log.info("Picked up carrot");
+    }
+   
+   
+    timer = timers.setTimeout(function() 
+    {
+      
+      checkIfClose();
+      log.info('500ms has elapsed! Going to check distance again');
+      //reset to say it' good to go
+      readyToCheck = true;
+      
+    }, 500);
+    
+  }
+  else
+  return;
+
+}
+
+
+function checkIfClose()
+{
+
+    //get trigger position
+    if(keyObject !== null)
+    {
+      if(keyObject.visible === true)
+      {
+    
+        //get current position
+        var myTransform = self.transform.worldPosition;
+  
+        var keyPosition = keyObject.transform.worldPosition;
+        
+        if(keyPosition === null)
+          log.error("failed to find keyposition object");
+        
+        var distance = v.distanceSqr(myTransform, keyPosition);
+         
+        if(USE_DEBUGMODE)
+        {
+          log.info("distance " + distance);
+        }
+         
+        if(v.distanceSqr(myTransform, keyPosition) < PROX_THRESH)
+          {  
+          
+            if(MSG_PLACED){
+              messages.dispatch(MSG_PLACED, true);
+              
+              log.info("triggered by carrot");
+            }
+              
+            if(USE_DEBUGMODE)
+            {
+              log.info("object placed/triggered");
+            }
+         }
+    
+      }
+    }
+ 
+}
+
+/**
+ * Called before the script is removed or rebuilt.
+ */
+function exit() {
+  
+  if(timer)
+    timers.clearInterval(timer);
+  
+  if(MSG_PICKUP)
+    messages.off(MSG_PICKUP, Pickup);
+      
+  if(MSG_RELEASE)
+    messages.off(MSG_RELEASE, checkIfClose);
+
+}
+
+module.exports = {
+  enter: enter,
+  exit: exit
+};
+    
